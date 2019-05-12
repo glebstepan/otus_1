@@ -1,1 +1,1 @@
-# The script analyse python code in folders. See folders.txt.
+# The script analyse python code in folders.
