@@ -4,6 +4,8 @@ import collections
 
 from nltk import pos_tag
 
+TOP_COMMON = 200
+
 
 def flat(_list):
     """ [(1,2), (3,4)] -> [1, 2, 3, 4]"""
@@ -24,8 +26,7 @@ def get_trees(_path, with_filenames=False, with_file_content=False):
         for file in files:
             if file.endswith('.py'):
                 file_names.append(os.path.join(dirname, file))
-                if len(file_names) == 100:
-                    break
+
     print('total %s files' % len(file_names))
     for file_name in file_names:
         with open(file_name, 'r', encoding='utf-8') as attempt_handler:
@@ -63,25 +64,31 @@ def split_snake_case_name_to_words(name):
 
 def get_all_words_in_path(path):
     trees = [t for t in get_trees(path) if t]
-    function_names = [f for f in flat([get_all_names(t) for t in trees]) if not (f.startswith('__') and f.endswith('__'))]
+    function_names = [f for f in flat([get_all_names(tree) for tree in trees]) \
+                      if not (f.startswith('__') and f.endswith('__'))]
     return flat([split_snake_case_name_to_words(function_name) for function_name in function_names])
 
 
-def get_top_verbs_in_path(path, top_size=10):
+def get_top_verbs_in_path(path):
     trees = [t for t in get_trees(path) if t]
-    fncs = [f for f in flat([[node.name.lower() for node in ast.walk(t) if isinstance(node, ast.FunctionDef)] for t in trees]) if not (f.startswith('__') and f.endswith('__'))]
+    extracted_functions = [f for f in flat([[node.name.lower() \
+                              for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)] \
+                             for tree in trees]) if not (f.startswith('__') and f.endswith('__'))]
+
     # print('functions extracted')
-    verbs = flat([get_verbs_from_function_name(function_name) for function_name in fncs])
-    return collections.Counter(verbs).most_common(top_size)
+    verbs = flat([get_verbs_from_function_name(function_name) for function_name in extracted_functions])
+    return collections.Counter(verbs).most_common(TOP_COMMON)
 
 
-def get_top_functions_names_in_path(path, top_size=10):
-    t = get_trees(path)
-    nms = [f for f in flat([[node.name.lower() for node in ast.walk(t) if isinstance(node, ast.FunctionDef)] for t in t]) if not (f.startswith('__') and f.endswith('__'))]
-    return collections.Counter(nms).most_common(top_size)
+def get_top_functions_names_in_path(path):
+    trees = get_trees(path)
+    functions_names = [f for f in flat([[node.name.lower() for node in ast.walk(tree) \
+                                         if isinstance(node, ast.FunctionDef)] for tree in trees]) \
+                       if not (f.startswith('__') and f.endswith('__'))]
+    return collections.Counter(functions_names).most_common(TOP_COMMON)
 
 
-wds = []
+words = []
 
 projects = [
     'django',
@@ -94,12 +101,11 @@ projects = [
 
 for project in projects:
     path = os.path.join('.', project)
-    wds += get_top_verbs_in_path(path)
+    words += get_top_verbs_in_path(path)
 
 
 if __name__ == "__main__":
-    top_size = 200
 
-    print('total %s words, %s unique' % (len(wds), len(set(wds))))
-    for word, occurence in collections.Counter(wds).most_common(top_size):
+    print('total %s words, %s unique' % (len(words), len(set(words))))
+    for word, occurence in collections.Counter(words).most_common(TOP_COMMON):
         print(word, occurence)
